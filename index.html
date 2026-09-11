@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spellcaster</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    /* ── Loading Screen ─────────────────────────────────────── */
+    #loader {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #loader.done {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loader-label {
+      color: rgba(255,255,255,0.4);
+      font: 300 10px/1 system-ui, sans-serif;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    .loader-track {
+      width: 260px;
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .loader-fill {
+      position: absolute;
+      inset: 0;
+      width: 0%;
+      background: #fff;
+      transition: width 0.04s linear;
+    }
+    .loader-pct {
+      margin-top: 16px;
+      color: rgba(255,255,255,0.22);
+      font: 400 11px/1 system-ui, sans-serif;
+      letter-spacing: 0.12em;
+    }
+
+    /* ── Canvas (pinned by GSAP ScrollTrigger) ─────────────── */
+    #canvas-wrap {
+      width: 100%;
+      height: 100vh;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* ── Scroll hint ─────────────────────────────────────────── */
+    #hint {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #hint.show { opacity: 1; }
+    #hint.hide { opacity: 0; }
+    .hint-line {
+      width: 1px;
+      height: 44px;
+      background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.5));
+      animation: breathe 1.8s ease-in-out infinite;
+    }
+    .hint-label {
+      color: rgba(255,255,255,0.3);
+      font: 400 9px/1 system-ui, sans-serif;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.2; transform: scaleY(0.7); }
+      50%       { opacity: 1;   transform: scaleY(1);   }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading screen -->
+  <div id="loader">
+    <p class="loader-label">Loading</p>
+    <div class="loader-track">
+      <div class="loader-fill" id="loader-fill"></div>
+    </div>
+    <p class="loader-pct" id="loader-pct">0 / 240</p>
+  </div>
+
+  <!-- Scroll hint -->
+  <div id="hint">
+    <div class="hint-line"></div>
+    <span class="hint-label">scroll</span>
+  </div>
+
+  <!-- Canvas wrapper — GSAP will pin this -->
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+  </div>
+
+  <!-- GSAP + ScrollTrigger (no Locomotive Scroll — scrub handles smoothing) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/ScrollTrigger.min.js"></script>
+
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    /* ══════════════════════════════════════════════════════
+       CONFIG
+    ══════════════════════════════════════════════════════ */
+    const TOTAL = 240;       // total frames
+    const PX_PER_FRAME = 20; // scroll pixels allocated per frame
+
+    /* ══════════════════════════════════════════════════════
+       CANVAS SETUP
+    ══════════════════════════════════════════════════════ */
+    const canvas  = document.getElementById("c");
+    const ctx     = canvas.getContext("2d");
+
+    function setCanvasSize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    setCanvasSize();
+    window.addEventListener("resize", () => { setCanvasSize(); render(); });
+
+    /* ══════════════════════════════════════════════════════
+       FRAME PATHS  →  frames/frame_000001.png ... 000240.png
+    ══════════════════════════════════════════════════════ */
+    function frameSrc(i) {
+      return "spellcaster_frames_compressed/frame_" + String(i + 1).padStart(6, "0") + ".jpg";
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PRELOAD ALL IMAGES FIRST
+    ══════════════════════════════════════════════════════ */
+    const images   = new Array(TOTAL);
+    const imageSeq = { frame: 0 };
+
+    const loaderEl = document.getElementById("loader");
+    const fillEl   = document.getElementById("loader-fill");
+    const pctEl    = document.getElementById("loader-pct");
+    const hintEl   = document.getElementById("hint");
+
+    let done = 0;
+
+    for (let i = 0; i < TOTAL; i++) {
+      const img = new Image();
+      img.src = frameSrc(i);
+      img.onload = img.onerror = () => {
+        done++;
+        const pct = Math.round((done / TOTAL) * 100);
+        fillEl.style.width = pct + "%";
+        pctEl.textContent  = done + " / " + TOTAL;
+        if (done === TOTAL) onAllLoaded();
+      };
+      images[i] = img;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       RENDER  —  same scaleImage logic as reference (cover)
+    ══════════════════════════════════════════════════════ */
+    function render() {
+      const img = images[imageSeq.frame];
+      if (!img || !img.naturalWidth) return;
+
+      const cw     = canvas.width,  ch = canvas.height;
+      const iw     = img.width,     ih = img.height;
+      const ratio  = Math.max(cw / iw, ch / ih);   // cover
+      const sx     = (cw - iw * ratio) / 2;
+      const sy     = (ch - ih * ratio) / 2;
+
+      ctx.clearRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, iw, ih, sx, sy, iw * ratio, ih * ratio);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BOOT  —  only fires when every image is loaded
+    ══════════════════════════════════════════════════════ */
+    function onAllLoaded() {
+
+      /* Short pause so user sees 100% */
+      setTimeout(() => {
+
+        // Fade out loader
+        loaderEl.classList.add("done");
+
+        // Draw frame 0
+        render();
+
+        // Show scroll hint
+        setTimeout(() => hintEl.classList.add("show"), 600);
+
+        // Init GSAP after loader is gone
+        setTimeout(initAnimation, 400);
+
+      }, 300);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       GSAP SCROLL ANIMATION
+    ══════════════════════════════════════════════════════ */
+    function initAnimation() {
+
+      // Total scroll distance = px per frame × total frames
+      const scrollDistance = PX_PER_FRAME * TOTAL; // 20 × 240 = 4800px
+
+      gsap.to(imageSeq, {
+        frame: TOTAL - 1,         // 0 → 239
+        snap: "frame",            // always a whole number
+        ease: "none",             // linear: 1 scroll px = equal frame progress
+        scrollTrigger: {
+          trigger: "#canvas-wrap",
+          start:   "top top",
+          end:     "+=" + scrollDistance,   // exactly 4800px of scroll
+          pin:     true,          // pin canvas-wrap while scrolling
+          scrub:   0.5,           // smooth lag (higher = more cinematic)
+          // markers: true,       // ← uncomment to debug positions
+        },
+        onUpdate: render,
+      });
+
+      // Hide scroll hint once user starts scrolling
+      let hintGone = false;
+      window.addEventListener("scroll", () => {
+        if (!hintGone && window.scrollY > 40) {
+          hintEl.classList.remove("show");
+          hintEl.classList.add("hide");
+          hintGone = true;
+        }
+      }, { passive: true });
+    }
+  </script>
+</body>
+</html>
