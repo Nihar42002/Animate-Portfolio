@@ -122,6 +122,7 @@ canvas {
   pointer-events: none;
   z-index: 20;
 }
+
 #hint.show { opacity: 1; }
 #hint.hide { opacity: 0; }
 .hint-line {
@@ -296,6 +297,7 @@ section {
   margin-bottom: 24px;
   text-transform: uppercase;
 }
+
 .hero-title {
   font-size: 54px;
   font-weight: 800;
@@ -304,6 +306,7 @@ section {
   margin-bottom: 20px;
   color: var(--text-dark);
 }
+
 .hero-title .highlight {
   background: linear-gradient(135deg, var(--magic-cyan), var(--rune-gold));
   background-clip: text;
@@ -311,6 +314,7 @@ section {
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
+
 .hero-desc {
   font-size: 16px;
   color: var(--text-muted);
@@ -319,12 +323,14 @@ section {
   margin-bottom: 32px;
   font-weight: 500;
 }
+
 .hero-actions {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 48px;
 }
+
 .btn-primary {
   background: linear-gradient(135deg, var(--magic-cyan), #0369a1);
   color: #fff;
@@ -339,10 +345,12 @@ section {
   transition: all 0.2s ease;
   box-shadow: 0 4px 20px rgba(2, 132, 199, 0.35);
 }
+
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(2, 132, 199, 0.5);
 }
+
 .btn-secondary {
   background: rgba(255, 255, 255, 0.85);
   color: var(--text-dark);
