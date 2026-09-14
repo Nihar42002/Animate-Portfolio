@@ -139,20 +139,39 @@ document.addEventListener("DOMContentLoaded", () => {
         hintGone = true;
       }
 
-      // Highlight active section link in Navbar
-      sections.forEach(sec => {
-        const top = sec.offsetTop - 120;
-        const height = sec.offsetHeight;
-        const id = sec.getAttribute("id");
-        if (scrollY >= top && scrollY < top + height) {
-          navLinks.forEach(link => {
-            link.classList.remove("active");
-            if (link.getAttribute("href") === "#" + id) {
-              link.classList.add("active");
-            }
-          });
-        }
-      });
+      // If the page is scrolled (near) all the way to the bottom, the last
+      // section's offset-based range can be unreachable (scrollY is capped
+      // at document.height - window.innerHeight). Treat "near the bottom"
+      // as a special case so the final nav link (e.g. Contact) can still
+      // become active.
+      const atBottom =
+        scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+
+      if (atBottom) {
+        const lastSection = sections[sections.length - 1];
+        const lastId = lastSection.getAttribute("id");
+        navLinks.forEach(link => {
+          link.classList.remove("active");
+          if (link.getAttribute("href") === "#" + lastId) {
+            link.classList.add("active");
+          }
+        });
+      } else {
+        // Highlight active section link in Navbar
+        sections.forEach(sec => {
+          const top = sec.offsetTop - 120;
+          const height = sec.offsetHeight;
+          const id = sec.getAttribute("id");
+          if (scrollY >= top && scrollY < top + height) {
+            navLinks.forEach(link => {
+              link.classList.remove("active");
+              if (link.getAttribute("href") === "#" + id) {
+                link.classList.add("active");
+              }
+            });
+          }
+        });
+      }
     }, { passive: true });
   }
 });
